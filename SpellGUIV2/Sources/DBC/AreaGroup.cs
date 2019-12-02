@@ -1,177 +1,135 @@
-﻿using SpellEditor.Sources.Config;
+﻿using SpellEditor.Sources.Database;
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.IO;
-using System.Runtime.InteropServices;
 using System.Windows.Controls;
 
 namespace SpellEditor.Sources.DBC
 {
-    class AreaGroup
+    class AreaGroup : AbstractDBC
     {
-        // Begin Window
         private MainWindow main;
-		private DBAdapter adapter;
-        // End Window
+        private IDatabaseAdapter adapter;
+        
+        public List<AreaGroupLookup> Lookups;
 
-        // Begin DBCs
-        public DBC_Header header;
-        public AreaGroup_DBC_Map body;
-        // End DBCs
-
-        public AreaGroup(MainWindow window, DBAdapter adapter)
+        public AreaGroup(MainWindow window, IDatabaseAdapter adapter)
         {
-            this.main = window;
+            main = window;
             this.adapter = adapter;
 
-            for (UInt32 i = 0; i < header.RecordCount; ++i)
+            try
             {
-                body.records[i].ID = new UInt32();
-                body.records[i].AreaID = new UInt32[6];
-                body.records[i].NextGroup = new UInt32();
+                ReadDBCFile("DBC/AreaGroup.dbc");
+
+                Lookups = new List<AreaGroupLookup>();
+                int boxIndex = 1;
+
+                main.AreaGroup.Items.Add(0);
+
+                AreaGroupLookup t;
+                t.ID = 0;
+                t.comboBoxIndex = 0;
+
+                Lookups.Add(t);
+
+                for (uint i = 0; i < Header.RecordCount; ++i)
+                {
+                    var record = Body.RecordMaps[i];
+                    uint id = (uint)record["ID"];
+
+                    AreaGroupLookup temp;
+
+                    ArrayList al = new ArrayList();
+
+                    var recordPointer = record;
+                    do
+                    {
+                        for (int areaIdCol = 1; areaIdCol <= 6; ++areaIdCol)
+                        {
+                            uint val = (uint)recordPointer["AreaId" + areaIdCol];
+                            if (val != 0)
+                                al.Add(val);
+                        }
+                        recordPointer = FindAreaGroup((uint)recordPointer["NextGroup"]);
+                    } while ((uint)recordPointer["NextGroup"] != 0);
+
+                    temp.ID = (int)id;
+                    temp.comboBoxIndex = boxIndex;
+                    Label areaGroupLab = new Label();
+
+                    string areaList_str = "";
+                    foreach (uint val in al)
+                    {
+                        areaList_str += "AreaId:";
+                        areaList_str += val;
+                        areaList_str += "\t\t";
+                        areaList_str += window.GetAreaTableName(val);
+                        areaList_str += "\n";
+                    }
+
+                    areaGroupLab.ToolTip = areaList_str;
+
+                    string contentString = record["ID"].ToString() + ": ";
+                    foreach (uint val in al)
+                        contentString += window.GetAreaTableName(val) + ", ";
+                    if (al.Count > 0)
+                        contentString = contentString.Substring(0, contentString.Length - 2);
+                    areaGroupLab.Content = contentString.Length > 120 ? (contentString.Substring(0, 110) + "...") : contentString;
+
+                    main.AreaGroup.Items.Add(areaGroupLab);
+
+                    Lookups.Add(temp);
+
+                    boxIndex++;
+                    Reader.CleanStringsMap();
+                }
+                Reader.CleanStringsMap();
             }
-
-            if (!File.Exists("DBC/AreaGroup.dbc"))
+            catch (Exception ex)
             {
-                main.HandleErrorMessage("AreaGroup.dbc was not found!");
-
+                main.HandleErrorMessage(ex.Message);
                 return;
             }
-
-            FileStream fileStream = new FileStream("DBC/AreaGroup.dbc", FileMode.Open);
-            int count = Marshal.SizeOf(typeof(DBC_Header));
-            byte[] readBuffer = new byte[count];
-            BinaryReader reader = new BinaryReader(fileStream);
-            readBuffer = reader.ReadBytes(count);
-            GCHandle handle = GCHandle.Alloc(readBuffer, GCHandleType.Pinned);
-            header = (DBC_Header)Marshal.PtrToStructure(handle.AddrOfPinnedObject(), typeof(DBC_Header));
-            handle.Free();
-
-            body.records = new AreaGroup_DBC_Record[header.RecordCount];
-
-            for (UInt32 i = 0; i < header.RecordCount; ++i)
-            {
-                count = Marshal.SizeOf(typeof(AreaGroup_DBC_Record));
-                readBuffer = new byte[count];
-                reader = new BinaryReader(fileStream);
-                readBuffer = reader.ReadBytes(count);
-                handle = GCHandle.Alloc(readBuffer, GCHandleType.Pinned);
-                body.records[i] = (AreaGroup_DBC_Record)Marshal.PtrToStructure(handle.AddrOfPinnedObject(), typeof(AreaGroup_DBC_Record));
-                handle.Free();
-            }
-
-            reader.Close();
-            fileStream.Close();
-
-            body.lookup = new List<AreaGroupLookup>();
-
-            int boxIndex = 1;
-
-            main.AreaGroup.Items.Add(0);
-
-            AreaGroupLookup t;
-
-            t.ID = 0;
-            t.comboBoxIndex = 0;
-
-            body.lookup.Add(t);
-
-            for (UInt32 i = 0; i < header.RecordCount; ++i)
-            {
-                int id = (int)body.records[i].ID;
-
-                AreaGroupLookup temp;
-
-				AreaGroup_DBC_Record agTemp = body.records[i];
-
-				System.Collections.ArrayList al = new System.Collections.ArrayList();
-
-				do
-				{
-					foreach (UInt32 val in agTemp.AreaID)
-						if (val!=0) 
-							al.Add(val);
-
-					agTemp = FindAreaGroup(agTemp.NextGroup);
-
-				} while (agTemp.NextGroup != 0);
-
-                temp.ID = id;
-                temp.comboBoxIndex = boxIndex;
-				Label areaGroupLab = new Label();
-
-				areaGroupLab.Content = id.ToString() + "\t\t";
-
-				String areaList_str = "";
-				foreach (UInt32 val in al)
-				{
-					areaList_str += "AreaId:";
-					areaList_str += val;
-					areaList_str += "\t\t";
-					areaList_str += window.GetAreaTableName(val);
-					areaList_str += "\n";
-				}
-
-				areaGroupLab.ToolTip = areaList_str;
-
-				main.AreaGroup.Items.Add(areaGroupLab);
-
-                body.lookup.Add(temp);
-
-                boxIndex++;
-            }
+            
         }
 
-		public AreaGroup_DBC_Record FindAreaGroup(UInt32 fId)
-		{
-			foreach (AreaGroup_DBC_Record o in body.records) 
-			{
-				if (o.ID == fId)
-					return o;
-			}
-			return new AreaGroup_DBC_Record();
-		}
+        public Dictionary<string, object> FindAreaGroup(uint fId)
+        {
+            foreach (var record in Body.RecordMaps) 
+            {
+                if ((uint) record["ID"] == fId)
+                    return record;
+            }
+            var returnVal = new Dictionary<string, object>();
+            returnVal.Add("NextGroup", (uint) 0);
+            return returnVal;
+        }
 
         public void UpdateAreaGroupSelection()
         {
-            uint ID = UInt32.Parse(adapter.query(string.Format("SELECT `AreaGroupID` FROM `{0}` WHERE `ID` = '{1}'", adapter.Table, main.selectedID)).Rows[0][0].ToString());
+            uint ID = uint.Parse(adapter.Query(string.Format("SELECT `AreaGroupID` FROM `{0}` WHERE `ID` = '{1}'", "spell", main.selectedID)).Rows[0][0].ToString());
 
             if (ID == 0)
             {
                 main.AreaGroup.threadSafeIndex = 0;
-
                 return;
             }
 
-            for (int i = 0; i < body.lookup.Count; ++i)
+            for (int i = 0; i < Lookups.Count; ++i)
             {
-                if (ID == body.lookup[i].ID)
+                if (ID == Lookups[i].ID)
                 {
-                    main.AreaGroup.threadSafeIndex = body.lookup[i].comboBoxIndex;
-
+                    main.AreaGroup.threadSafeIndex = Lookups[i].comboBoxIndex;
                     break;
                 }
             }
         }
     }
 
-    public struct AreaGroup_DBC_Map
-    {
-        public AreaGroup_DBC_Record[] records;
-        public List<AreaGroupLookup> lookup;
-    };
-
     public struct AreaGroupLookup
     {
         public int ID;
         public int comboBoxIndex;
-    };
-
-    public struct AreaGroup_DBC_Record
-    {
-        public UInt32 ID;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
-        public UInt32[] AreaID;
-        public UInt32 NextGroup;
     };
 }

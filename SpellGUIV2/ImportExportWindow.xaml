@@ -1,0 +1,28 @@
+﻿<controls:MetroWindow
+        x:Class="SpellEditor.ImportExportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
+        xmlns:c="clr-namespace:SpellEditor.Sources.Controls"
+        Title="{DynamicResource ImportExportWindowTitle}"
+        WindowStartupLocation="CenterScreen"
+        Icon="icon.ico"
+        Loaded="_Loaded">
+    <controls:MetroWindow.Resources>
+        <ResourceDictionary>
+            <Style TargetType="c:ThreadSafeComboBox" BasedOn="{StaticResource {x:Type ComboBox}}"/>
+            <Style TargetType="c:ThreadSafeTextBox" BasedOn="{StaticResource {x:Type TextBox}}"/>
+            <Style TargetType="c:ThreadSafeCheckBox" BasedOn="{StaticResource {x:Type CheckBox}}"/>
+        </ResourceDictionary>
+    </controls:MetroWindow.Resources>
+    <Grid>
+        <TabControl Name="MainTabControl" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="10,10,10,10" SelectionChanged="TabControl_SelectionChanged">
+      <TabItem Header="{DynamicResource butImportExportWindowImport}">
+        <UniformGrid Name="ImportGrid" Columns = "1"/>
+      </TabItem>
+      <TabItem Header="{DynamicResource butImportExportWindowExport}">
+        <UniformGrid Name="ExportGrid" Columns = "1"/>
+      </TabItem>
+        </TabControl>
+    </Grid>
+</controls:MetroWindow>
